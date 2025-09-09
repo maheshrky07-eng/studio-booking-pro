@@ -13,4 +13,4 @@ export const STUDIOS: { id: string; name: string }[] = [
 export const START_HOUR: number = 8; // 8 AM
 export const END_HOUR: number = 23; // 11 PM
 
-export const RECORDING_PURPOSES: RecordingPurpose[] = ['YouTube', 'Planner', 'Smart Course'];
+export const RECORDING_PURPOSES: RecordingPurpose[] = ['YouTube', 'Planner', 'Smart Course', 'Live'];

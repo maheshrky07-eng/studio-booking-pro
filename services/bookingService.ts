@@ -1,3 +1,4 @@
+
 import type { Booking, NewBooking } from '../types';
 
 const API_DELAY = 500; // Keep delay for user feedback on network activity
@@ -47,16 +48,22 @@ export const bookingService = {
                 const result = await response.json();
                 if (result.success) {
                     // Ensure all booking fields are present, providing defaults if necessary
-                    const sanitizedData = result.data.map((b: any) => ({
-                        id: b.id || '',
-                        studio: b.studio || '',
-                        date: b.date || '',
-                        startTime: b.startTime || '',
-                        endTime: b.endTime || '',
-                        userName: b.userName || '',
-                        purpose: b.purpose || 'YouTube',
-                        subject: b.subject || '',
-                    }));
+                    const sanitizedData = result.data.map((b: any) => {
+                        // When Google Sheets returns a date, it can be a full ISO string.
+                        // We must parse it to 'YYYY-MM-DD' to match the app's internal format.
+                        const dateString = b.date ? (b.date.toString().includes('T') ? b.date.toString().split('T')[0] : b.date) : '';
+
+                        return {
+                            id: b.id || '',
+                            studio: b.studio || '',
+                            date: dateString,
+                            startTime: b.startTime || '',
+                            endTime: b.endTime || '',
+                            userName: b.userName || '',
+                            purpose: b.purpose || 'YouTube',
+                            subject: b.subject || '',
+                        };
+                    });
                     resolve(sanitizedData as Booking[]);
                 } else {
                     throw new Error(result.message || 'An error occurred while fetching data from the sheet.');
@@ -79,6 +86,7 @@ export const bookingService = {
                 } else {
                     reject(new Error(response.message || 'Failed to add booking via Google Sheet.'));
                 }
+// FIX: Corrected the syntax of the catch block. The previous malformed block caused multiple cascading errors.
             } catch (error) {
                 reject(error);
             }

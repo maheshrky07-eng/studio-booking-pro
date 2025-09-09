@@ -1,4 +1,4 @@
-export type RecordingPurpose = 'YouTube' | 'Planner' | 'Smart Course';
+export type RecordingPurpose = 'YouTube' | 'Planner' | 'Smart Course' | 'Live';
 
 export interface Booking {
   id: string;
