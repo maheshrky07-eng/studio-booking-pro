@@ -1,0 +1,5 @@
+
+{
+  "name": "Studio Booking Pro",
+  "description": "A sleek and responsive web application for booking studio time slots. It features a 7-day rolling calendar, real-time availability updates, and a clean interface for managing bookings across multiple studios. Data is persisted to simulate a backend connection."
+}
