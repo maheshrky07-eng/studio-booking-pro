@@ -1,5 +1,3 @@
-// components/GoogleSheetModal.tsx
-
 import React, { useState } from 'react';
 
 interface GoogleSheetModalProps {
@@ -22,7 +20,14 @@ function doGet(e) {
     const headers = data.shift(); // Get headers from the sheet itself
     const json = data.map(row => {
       let obj = {};
-      headers.forEach((header, i) => obj[header] = row[i]);
+      headers.forEach((header, i) => {
+        // Handle dates specifically to ensure they are formatted correctly
+        if (header === 'date' && row[i] instanceof Date) {
+          obj[header] = Utilities.formatDate(row[i], Session.getScriptTimeZone(), "yyyy-MM-dd");
+        } else {
+          obj[header] = row[i];
+        }
+      });
       return obj;
     });
     
@@ -77,17 +82,34 @@ function handleAdd(sheet, bookingData) {
   const studioIndex = headers.indexOf('studio');
   const startTimeIndex = headers.indexOf('startTime');
   const endTimeIndex = headers.indexOf('endTime');
+  const userNameIndex = headers.indexOf('userName');
+
+  if ([dateIndex, studioIndex, startTimeIndex, endTimeIndex, userNameIndex].includes(-1)) {
+    throw new Error("One or more required headers (date, studio, startTime, endTime, userName) are missing from the sheet.");
+  }
 
   const newStart = timeToMinutes(bookingData.startTime);
   const newEnd = timeToMinutes(bookingData.endTime);
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (row[dateIndex] === bookingData.date && row[studioIndex] === bookingData.studio) {
+    
+    const sheetDateRaw = row[dateIndex];
+    if (!sheetDateRaw) continue; // Skip empty rows
+    
+    const formattedSheetDate = Utilities.formatDate(new Date(sheetDateRaw), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    
+    if (formattedSheetDate === bookingData.date && row[studioIndex] === bookingData.studio) {
       const existingStart = timeToMinutes(row[startTimeIndex]);
       const existingEnd = timeToMinutes(row[endTimeIndex]);
+      
       if (newStart < existingEnd && newEnd > existingStart) {
-        throw new Error("This time slot overlaps with an existing booking in the sheet.");
+        const existingUserName = row[userNameIndex] || 'another user';
+        const existingStartTime = row[startTimeIndex];
+        const existingEndTime = row[endTimeIndex];
+        const startTime12hr = formatTo12hr(existingStartTime);
+        const endTime12hr = formatTo12hr(existingEndTime);
+        throw new Error(\`Booking conflict! This slot is already taken by \${existingUserName} from \${startTime12hr} to \${endTime12hr}.\`);
       }
     }
   }
@@ -102,6 +124,7 @@ function handleAdd(sheet, bookingData) {
     .createTextOutput(JSON.stringify({ success: true, data: newBooking }))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
 
 function handleDelete(sheet, deleteData) {
   const data = sheet.getDataRange().getValues();
@@ -127,6 +150,17 @@ function timeToMinutes(timeStr) {
   if (typeof timeStr !== 'string' || !timeStr.includes(':')) return 0;
   const parts = timeStr.split(':');
   return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
+
+function formatTo12hr(timeStr) {
+  if (typeof timeStr !== 'string' || !timeStr.includes(':')) return timeStr;
+  const parts = timeStr.split(':');
+  let hours = parseInt(parts[0], 10);
+  let minutes = parts[1];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  return hours + ':' + minutes + ' ' + ampm;
 }
 `.trim();
 
