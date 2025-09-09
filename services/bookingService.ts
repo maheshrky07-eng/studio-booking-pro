@@ -28,7 +28,9 @@ const postToActionApi = async (payload: object): Promise<any> => {
 
 export const bookingService = {
   getBookings: async (): Promise<Booking[]> => {
-    const url = getSheetUrl();
+    // Add a cache-busting query parameter to ensure fresh data is fetched every time.
+    // Google Apps Script GET requests can be aggressively cached, leading to stale data.
+    const url = `${getSheetUrl()}?timestamp=${new Date().getTime()}`;
     try {
         const response = await fetch(url, {
             method: 'GET',
