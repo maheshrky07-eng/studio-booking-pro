@@ -21,9 +21,10 @@ function doGet(e) {
     const json = data.map(row => {
       let obj = {};
       headers.forEach((header, i) => {
-        // Handle dates specifically to ensure they are formatted correctly
+        // Handle dates specifically to ensure they are formatted correctly in UTC.
+        // This prevents timezone-related bugs where the date might shift by a day.
         if (header === 'date' && row[i] instanceof Date) {
-          obj[header] = Utilities.formatDate(row[i], Session.getScriptTimeZone(), "yyyy-MM-dd");
+          obj[header] = Utilities.formatDate(row[i], "UTC", "yyyy-MM-dd");
         } else {
           obj[header] = row[i];
         }
@@ -97,7 +98,9 @@ function handleAdd(sheet, bookingData) {
     const sheetDateRaw = row[dateIndex];
     if (!sheetDateRaw) continue; // Skip empty rows
     
-    const formattedSheetDate = Utilities.formatDate(new Date(sheetDateRaw), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    // Robustly format the date from the sheet to 'YYYY-MM-DD' in UTC.
+    // This ensures accurate calendar-day comparisons, preventing timezone-related bugs.
+    const formattedSheetDate = Utilities.formatDate(new Date(sheetDateRaw), "UTC", "yyyy-MM-dd");
     
     if (formattedSheetDate === bookingData.date && row[studioIndex] === bookingData.studio) {
       const existingStart = timeToMinutes(row[startTimeIndex]);
@@ -105,10 +108,8 @@ function handleAdd(sheet, bookingData) {
       
       if (newStart < existingEnd && newEnd > existingStart) {
         const existingUserName = row[userNameIndex] || 'another user';
-        const existingStartTime = row[startTimeIndex];
-        const existingEndTime = row[endTimeIndex];
-        const startTime12hr = formatTo12hr(existingStartTime);
-        const endTime12hr = formatTo12hr(existingEndTime);
+        const startTime12hr = formatTo12hr(row[startTimeIndex]);
+        const endTime12hr = formatTo12hr(row[endTimeIndex]);
         throw new Error(\`Booking conflict! This slot is already taken by \${existingUserName} from \${startTime12hr} to \${endTime12hr}.\`);
       }
     }

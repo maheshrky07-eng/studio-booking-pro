@@ -40,41 +40,21 @@ export const bookingService = {
         }
         const result = await response.json();
         if (result.success && Array.isArray(result.data)) {
-             // Ensure all booking fields are present and data formats are correct.
+             // The Apps Script now reliably returns clean data. We just need to ensure correct types.
             const sanitizedData = result.data
               .filter((b: any) => b && b.id) // Filter out empty or invalid rows
               .map((b: any) => {
-                let dateString = '';
-                if (b.date) {
-                  // The date from Google Sheets is often a full ISO string (e.g., 2025-09-09T04:00:00.000Z).
-                  // We must robustly parse just the 'YYYY-MM-DD' part to avoid timezone issues.
-                  // Creating a Date and using UTC methods ensures we get the date as it appears in the sheet.
-                  try {
-                    const d = new Date(b.date);
-                    // Check if date is valid
-                    if (isNaN(d.getTime())) {
-                        throw new Error('Invalid date value');
-                    }
-                    const year = d.getUTCFullYear();
-                    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-                    const day = String(d.getUTCDate()).padStart(2, '0');
-                    dateString = `${year}-${month}-${day}`;
-                  } catch (e) {
-                      console.error("Could not parse date, falling back:", b.date, e);
-                      // Fallback for non-standard date strings like '2025-09-09'
-                      dateString = String(b.date).split('T')[0];
-                  }
-                }
-
+                // The Apps Script now reliably provides a 'YYYY-MM-DD' string.
+                // No complex client-side parsing is needed. Trust the data from the source.
                 return {
-                    id: b.id || '',
-                    studio: b.studio || '',
-                    date: dateString,
-                    startTime: b.startTime || '',
-                    endTime: b.endTime || '',
-                    userName: b.userName || '',
+                    id: String(b.id || ''),
+                    studio: String(b.studio || ''),
+                    date: String(b.date || '').split('T')[0], // Should be 'YYYY-MM-DD', split is for safety.
+                    startTime: String(b.startTime || ''),
+                    endTime: String(b.endTime || ''),
+                    userName: String(b.userName || ''),
                     purpose: b.purpose || 'YouTube',
-                    subject: b.subject || '',
+                    subject: String(b.subject || ''),
                 };
             });
             return sanitizedData as Booking[];
