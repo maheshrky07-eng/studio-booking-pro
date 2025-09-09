@@ -1,7 +1,4 @@
-
 import type { Booking, NewBooking } from '../types';
-
-const API_DELAY = 500; // Keep delay for user feedback on network activity
 
 const getSheetUrl = (): string => {
   // Hardcode the single, shared URL for all users.
@@ -32,82 +29,92 @@ const postToActionApi = async (payload: object): Promise<any> => {
 export const bookingService = {
   getBookings: async (): Promise<Booking[]> => {
     const url = getSheetUrl();
-    
-    // Using a promise to keep the async structure and delay consistent
-    return new Promise((resolve, reject) => {
-        setTimeout(async () => {
-            try {
-                const response = await fetch(url, {
-                    method: 'GET',
-                    mode: 'cors',
-                });
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Failed to fetch from Google Sheet. Check your URL and script permissions. Status: ${response.status}. Message: ${errorText}`);
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch from Google Sheet. Check your URL and script permissions. Status: ${response.status}. Message: ${errorText}`);
+        }
+        const result = await response.json();
+        if (result.success && Array.isArray(result.data)) {
+             // Ensure all booking fields are present and data formats are correct.
+            const sanitizedData = result.data
+              .filter((b: any) => b && b.id) // Filter out empty or invalid rows
+              .map((b: any) => {
+                let dateString = '';
+                if (b.date) {
+                  // The date from Google Sheets is often a full ISO string (e.g., 2025-09-09T04:00:00.000Z).
+                  // We must robustly parse just the 'YYYY-MM-DD' part to avoid timezone issues.
+                  // Creating a Date and using UTC methods ensures we get the date as it appears in the sheet.
+                  try {
+                    const d = new Date(b.date);
+                    // Check if date is valid
+                    if (isNaN(d.getTime())) {
+                        throw new Error('Invalid date value');
+                    }
+                    const year = d.getUTCFullYear();
+                    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const day = String(d.getUTCDate()).padStart(2, '0');
+                    dateString = `${year}-${month}-${day}`;
+                  } catch (e) {
+                      console.error("Could not parse date, falling back:", b.date, e);
+                      // Fallback for non-standard date strings like '2025-09-09'
+                      dateString = String(b.date).split('T')[0];
+                  }
                 }
-                const result = await response.json();
-                if (result.success) {
-                    // Ensure all booking fields are present, providing defaults if necessary
-                    const sanitizedData = result.data.map((b: any) => {
-                        // When Google Sheets returns a date, it can be a full ISO string.
-                        // We must parse it to 'YYYY-MM-DD' to match the app's internal format.
-                        const dateString = b.date ? (b.date.toString().includes('T') ? b.date.toString().split('T')[0] : b.date) : '';
 
-                        return {
-                            id: b.id || '',
-                            studio: b.studio || '',
-                            date: dateString,
-                            startTime: b.startTime || '',
-                            endTime: b.endTime || '',
-                            userName: b.userName || '',
-                            purpose: b.purpose || 'YouTube',
-                            subject: b.subject || '',
-                        };
-                    });
-                    resolve(sanitizedData as Booking[]);
-                } else {
-                    throw new Error(result.message || 'An error occurred while fetching data from the sheet.');
-                }
-            } catch (error) {
-                console.error("Error fetching bookings:", error);
-                reject(error);
+                return {
+                    id: b.id || '',
+                    studio: b.studio || '',
+                    date: dateString,
+                    startTime: b.startTime || '',
+                    endTime: b.endTime || '',
+                    userName: b.userName || '',
+                    purpose: b.purpose || 'YouTube',
+                    subject: b.subject || '',
+                };
+            });
+            return sanitizedData as Booking[];
+        } else {
+            // Handle cases where result.data is not an array or success is false
+            const errorMessage = result.message || 'An error occurred while fetching data from the sheet.';
+            if (!Array.isArray(result.data)) {
+                console.error("Received non-array data from API:", result.data);
             }
-        }, API_DELAY);
-    });
+            throw new Error(errorMessage);
+        }
+    } catch (error) {
+        console.error("Error fetching bookings:", error);
+        throw error; // Re-throw the error to be caught by the hook
+    }
   },
 
   addBooking: async (newBooking: NewBooking): Promise<Booking> => {
-     return new Promise((resolve, reject) => {
-        setTimeout(async () => {
-            try {
-                const response = await postToActionApi({ action: 'add', data: newBooking });
-                if (response.success) {
-                    resolve(response.data as Booking);
-                } else {
-                    reject(new Error(response.message || 'Failed to add booking via Google Sheet.'));
-                }
-// FIX: Corrected the syntax of the catch block. The previous malformed block caused multiple cascading errors.
-            } catch (error) {
-                reject(error);
-            }
-        }, API_DELAY);
-    });
+    try {
+        const response = await postToActionApi({ action: 'add', data: newBooking });
+        if (response.success) {
+            return response.data as Booking;
+        } else {
+            throw new Error(response.message || 'Failed to add booking via Google Sheet.');
+        }
+    } catch (error) {
+        throw error;
+    }
   },
   
   deleteBooking: async (bookingId: string): Promise<void> => {
-     return new Promise((resolve, reject) => {
-        setTimeout(async () => {
-            try {
-                const response = await postToActionApi({ action: 'delete', data: { id: bookingId } });
-                 if (response.success) {
-                    resolve();
-                } else {
-                    reject(new Error(response.message || 'Failed to delete booking via Google Sheet.'));
-                }
-            } catch (error) {
-                reject(error);
-            }
-        }, API_DELAY);
-    });
+    try {
+        const response = await postToActionApi({ action: 'delete', data: { id: bookingId } });
+         if (response.success) {
+            return;
+        } else {
+            throw new Error(response.message || 'Failed to delete booking via Google Sheet.');
+        }
+    } catch (error) {
+        throw error;
+    }
   },
 };
