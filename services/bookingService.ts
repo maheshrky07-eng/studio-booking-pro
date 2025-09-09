@@ -1,20 +1,15 @@
-// services/bookingService.ts
-
 import type { Booking, NewBooking } from '../types';
 
-const GOOGLE_SHEET_URL_KEY = 'googleSheetWebAppUrl';
 const API_DELAY = 500; // Keep delay for user feedback on network activity
 
-const getSheetUrl = (): string | null => {
-  return localStorage.getItem(GOOGLE_SHEET_URL_KEY);
+const getSheetUrl = (): string => {
+  // Hardcode the single, shared URL for all users.
+  return 'https://script.google.com/macros/s/AKfycbzf7lkIAUrdkg8ilqEPbbTTKu1OzGKpZSInAMpQSL7LMZSxcgvvEQxwsSsLKrjXVBYv/exec';
 };
 
 // Helper for POST requests
 const postToActionApi = async (payload: object): Promise<any> => {
     const url = getSheetUrl();
-    if (!url) {
-        throw new Error('Google Sheet URL not configured.');
-    }
 
     const response = await fetch(url, {
         method: 'POST',
@@ -26,7 +21,8 @@ const postToActionApi = async (payload: object): Promise<any> => {
     });
 
     if (!response.ok) {
-        throw new Error(`Network response was not ok. Status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Network response was not ok. Status: ${response.status}. Message: ${errorText}`);
     }
     return response.json();
 }
@@ -35,10 +31,6 @@ const postToActionApi = async (payload: object): Promise<any> => {
 export const bookingService = {
   getBookings: async (): Promise<Booking[]> => {
     const url = getSheetUrl();
-    if (!url) {
-        // Return empty array if not configured; the UI will handle the prompt.
-        return []; 
-    }
     
     // Using a promise to keep the async structure and delay consistent
     return new Promise((resolve, reject) => {
@@ -49,7 +41,8 @@ export const bookingService = {
                     mode: 'cors',
                 });
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch from Google Sheet. Check your URL and script permissions. Status: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`Failed to fetch from Google Sheet. Check your URL and script permissions. Status: ${response.status}. Message: ${errorText}`);
                 }
                 const result = await response.json();
                 if (result.success) {
